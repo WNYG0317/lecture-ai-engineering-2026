@@ -67,6 +67,47 @@ def search_glossary(query: str) -> str:
     )
 
 
+def related_knowledge(term: str) -> str:
+    """用語集のカテゴリを使い、同じカテゴリの関連用語と説明を最大3件返す。
+
+    ユーザーが用語の意味を聞いたとき、search_glossary と併せて使い、
+    関連して学ぶとよい用語を提案する。term には用語名・ID・別名のいずれかを
+    1つ指定する（例: "LoRA"）。意味検索は行わず、対象用語自身は候補から除く。
+    """
+    query = _normalize(term)
+    if not query:
+        return "検索語が空です。調べたい用語を1つ指定してください。"
+    glossary = load_glossary()
+    matches = [entry for entry in glossary if query in _names(entry)]
+    if not matches:
+        return f"用語集に「{term}」は見つかりませんでした。用語名・ID・別名を指定してください。"
+    if len(matches) > 1:
+        return "複数の用語に一致しました。用語のIDを指定してください: " + ", ".join(
+            entry["id"] for entry in matches
+        )
+    target = matches[0]
+    candidates = [
+        entry for entry in glossary
+        if entry["id"] != target["id"] and entry["category"] == target["category"]
+    ][:MAX_RESULTS]
+    return json.dumps(
+        {
+            "term": target["term"],
+            "category": target["category"],
+            "related_terms": [
+                {
+                    "id": entry["id"],
+                    "term": entry["term"],
+                    "lecture": entry["lecture"],
+                    "definition": entry["definition"],
+                }
+                for entry in candidates
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+
 def get_lecture_summary(lecture: int) -> str:
     """指定した回（1始まりの整数）の講義の要点を返す。
 

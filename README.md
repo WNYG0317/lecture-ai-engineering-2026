@@ -61,6 +61,35 @@ tests/           テスト（APIキー不要）
 pyproject.toml / uv.lock  依存パッケージとその固定版
 ```
 
+## 関連用語の提案
+
+用語の意味を聞かれたとき、エージェントは `related_knowledge(term)` を呼び、
+`data/glossary.json` の同じ `category` に属する用語と説明を最大3件紹介します。
+対象は用語名・ID・別名で一致させ、候補は対象自身を除いて用語集の掲載順に返します。
+意味検索や `related` リンクによる探索は行いません。通常実行と MCP 経由の両方で利用できます。
+
+```bash
+uv run python -m app.agent --trace "LoRAとは？"
+```
+
+## Google ADK 版
+
+`adk_agent/glossary_agent` は、既存の用語検索・カテゴリによる関連知識の提案・
+講義の要点取得を Google ADK で使うエージェントです。ツールは `app/tools.py` を共用します。
+
+環境変数 `GEMINI_API_KEY`（または `GOOGLE_API_KEY`）を設定し、リポジトリのルートで実行します。
+ADK 版のモデルは `gemini-3.5-flash-lite` を指定し、指示文は `app.agent.INSTRUCTIONS` を共用します。
+
+```bash
+uv sync --frozen --extra adk --python 3.12
+uv run --extra adk adk run adk_agent/glossary_agent
+# Web UI では glossary_agent を選択する
+uv run --extra adk adk web adk_agent
+```
+
+`google-adk` は追加依存 `adk` として導入します。API キーを使わない確認は
+`uv run --extra adk pytest -q` で実行できます。
+
 ## 提出のしかた
 
 1. 回ごとに作業ブランチを作る（例：`git switch -c lec01`）

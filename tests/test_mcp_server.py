@@ -35,6 +35,7 @@ def test_glossary_server_exposes_search_tool(tmp_path):
 
     offered = {t.name for t in model.last_model_request_parameters.function_tools}
     assert GLOSSARY_TOOL in offered  # 演習でツールを足しても壊れないよう「含む」で判定
+    assert "glossary_related_knowledge" in offered
 
 
 def test_glossary_result_comes_back_through_mcp(tmp_path):
@@ -46,3 +47,13 @@ def test_glossary_result_comes_back_through_mcp(tmp_path):
     assert returns and returns[0].tool_name == GLOSSARY_TOOL
     assert str(returns[0].content).strip()  # 検索結果（または「見つかりませんでした」）が戻っている
     assert result.output
+
+
+def test_related_knowledge_comes_back_through_mcp(tmp_path):
+    name = "glossary_related_knowledge"
+    model = TestModel(call_tools=[name])
+    result = build_mcp_agent(_glossary_only_config(tmp_path)).run_sync("LoRAとは？", model=model)
+    assert [p.tool_name for p in _parts(result, ToolCallPart)] == [name]
+    returns = _parts(result, ToolReturnPart)
+    assert returns and returns[0].tool_name == name
+    assert str(returns[0].content).strip()
