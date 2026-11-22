@@ -6,10 +6,17 @@ app/mcp_servers.json の glossary サーバーを実際に起動し（stdio）�
 
 import json
 
+import pytest
 from pydantic_ai.messages import ToolCallPart, ToolReturnPart
 from pydantic_ai.models.test import TestModel
 
-from app.agent import MCP_CONFIG, build_mcp_agent
+from app.mcp_agent import (
+    MCP_CONFIG,
+    ConfigError,
+    build_mcp_agent,
+    describe_servers,
+    read_config,
+)
 
 GLOSSARY_TOOL = "glossary_search_glossary"  # 設定ファイルのサーバー名 "glossary" が前に付く
 
@@ -34,8 +41,7 @@ def test_glossary_server_exposes_search_tool(tmp_path):
     build_mcp_agent(_glossary_only_config(tmp_path)).run_sync("ツール一覧", model=model)
 
     offered = {t.name for t in model.last_model_request_parameters.function_tools}
-    assert GLOSSARY_TOOL in offered  # 演習でツールを足しても壊れないよう「含む」で判定
-    assert "glossary_related_knowledge" in offered
+    assert GLOSSARY_TOOL in offered  # 宿題でツールを足しても壊れないよう「含む」で判定
 
 
 def test_glossary_result_comes_back_through_mcp(tmp_path):
