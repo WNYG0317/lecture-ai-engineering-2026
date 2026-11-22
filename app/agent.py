@@ -5,6 +5,7 @@
     uv run python -m app.agent --trace "LoRAとQLoRAの違いは？"   # ツール呼び出しを表示
     uv run python -m app.agent --graph --trace "LoRAとQLoRAの違いは？"  # 検索からグラフをたどって回答
     uv run python -m app.agent --tree --trace "LoRAとQLoRAの違いは？"  # 目次をたどって回答
+    uv run python -m app.agent --hybrid --trace "LoRAとQLoRAの違いは？"  # Treeで不足時だけGraphを使う
     uv run python -m app.agent --full-context --trace "LoRAとQLoRAの違いは？"  # 全資料を一度に渡す
     uv run python -m app.agent --mcp --trace "LoRAとは？"        # 第5回: ツールを MCP サーバーから受け取る
     uv run python -m app.agent --mcp --list-tools               # 第5回: モデルに見えるツール一覧（APIキー不要）
@@ -139,6 +140,15 @@ def print_tools(target: Agent) -> None:
 def print_trace(result, elapsed_seconds: float | None = None) -> None:
     """どのツールが、どの引数で呼ばれ、何を返したかを表示する。"""
     print("\n--- trace ---")
+    if hasattr(result, "assessment"):
+        check = result.assessment
+        print(f"[充足判断] {'十分' if check.sufficient else '不足'}: {check.reason}")
+        print(f"[不足情報] {json.dumps(check.missing_information, ensure_ascii=False)}")
+        print(f"[Graph入口] {check.anchor_page_ids}")
+        if result.graph is None:
+            print("[Graph] 実行せず、Treeの本文だけで回答")
+        else:
+            print(f"[Graph] {json.dumps(result.graph, ensure_ascii=False)}")
     paths = {}
     for message in result.all_messages():
         for part in message.parts:
@@ -181,6 +191,7 @@ def main() -> None:
     modes.add_argument("--mcp", action="store_true", help="第5回: ツールを MCP サーバー（app/mcp_servers.json）から受け取る")
     modes.add_argument("--graph", action="store_true", help="検索結果からグラフをたどり、候補ページを読んで答える")
     modes.add_argument("--tree", action="store_true", help="目次をたどり、必要なページを読んで答える")
+    modes.add_argument("--hybrid", action="store_true", help="Treeで根拠を確認し、不足時だけGraphで補う")
     modes.add_argument("--full-context", action="store_true", help="検索せず、lectures.jsonの全資料を一度に渡す")
     parser.add_argument("--list-tools", action="store_true", help="モデルに見えるツール一覧を表示して終了する（APIキー不要）")
     args = parser.parse_args()
@@ -191,6 +202,8 @@ def main() -> None:
         mode = target.override(instructions=TREE_INSTRUCTIONS, tools=[tools.browse_tree])
     elif args.graph:
         mode = target.override(instructions=GRAPH_INSTRUCTIONS, tools=[tools.search_graph])
+    elif args.hybrid and args.list_tools:
+        target = Agent(tools=[tools.browse_tree])
     with mode:
         if args.list_tools:
             if args.full_context:
@@ -208,7 +221,10 @@ def main() -> None:
 
         started = perf_counter()
         try:
-            if args.full_context:
+            if args.hybrid:
+                from app.hybrid import run_hybrid
+                result = run_hybrid(args.question, build_model())
+            elif args.full_context:
                 result = run_full_context(
                     target, args.question, build_model(),
                     instructions=FULL_CONTEXT_INSTRUCTIONS, prompt_template=FULL_CONTEXT_PROMPT,

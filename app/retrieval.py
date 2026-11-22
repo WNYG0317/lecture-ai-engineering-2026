@@ -140,6 +140,23 @@ def search(query: str) -> list[dict]:
 
 def search_graph(query: str) -> dict:
     """ベクトル検索を入口に、前後ページと共通用語で候補を広げる。"""
+    seeds = search(query)[:min(GRAPH_START_K, GRAPH_MAX_RESULTS)]
+    return _expand_graph(seeds)
+
+
+def expand_graph(page_ids: list[str]) -> dict:
+    """Treeで読んだページを入口にGraphを探索する。埋め込みAPIは使わない。"""
+    pages = {page["page_id"]: page for page in load_pages(RAG_SOURCE)}
+    unique_ids = list(dict.fromkeys(page_ids))
+    if not unique_ids or any(page_id not in pages for page_id in unique_ids):
+        raise ValueError("対象資料のページIDを1つ以上指定してください。")
+    if len(unique_ids) > GRAPH_MAX_RESULTS:
+        raise ValueError(f"入口ページは最大{GRAPH_MAX_RESULTS}件です。")
+    return _expand_graph([pages[page_id] for page_id in unique_ids])
+
+
+def _expand_graph(seed_pages: list[dict]) -> dict:
+    """与えられた入口から、既定のhop数・ページ数の範囲で探索する。"""
     pages = {page["page_id"]: page for page in load_pages(RAG_SOURCE)}
     graph = json.loads(RAG_GRAPH.read_text(encoding="utf-8"))
     nodes = {node["id"]: node for node in graph["nodes"]
@@ -151,12 +168,12 @@ def search_graph(query: str) -> dict:
             adjacent[a].add(b)
             adjacent[b].add(a)
 
-    seeds = [hit for hit in search(query) if hit["page_id"] in pages][:min(GRAPH_START_K, GRAPH_MAX_RESULTS)]
+    seeds = [hit for hit in seed_pages if hit["page_id"] in pages][:GRAPH_MAX_RESULTS]
     seed_ids = {seed["page_id"] for seed in seeds}
     results, candidates = [], {}
     for rank, seed in enumerate(seeds):
         root = seed["page_id"]
-        results.append({**pages[root], "distance": seed["distance"], "hops": 0,
+        results.append({**pages[root], **({"distance": seed["distance"]} if "distance" in seed else {}), "hops": 0,
                         "path": [{"id": root, "title": pages[root]["title"]}]})
         queue = deque([(root, [root])])
         visited = {root}
