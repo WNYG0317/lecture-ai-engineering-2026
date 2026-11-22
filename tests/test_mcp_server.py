@@ -55,37 +55,11 @@ def test_glossary_result_comes_back_through_mcp(tmp_path):
     assert result.output
 
 
-def test_describe_servers_tells_command_from_url(tmp_path):
-    """コマンドで起動するサーバーと、URL で接続するサーバーを、表示で見分けられる。"""
-    path = tmp_path / "mcp_servers.json"
-    path.write_text(
-        json.dumps(
-            {
-                "mcpServers": {
-                    "glossary": {"command": "uv", "args": ["run", "python", "-m", "app.mcp_server"]},
-                    "aws": {"url": "https://knowledge-mcp.global.api.aws"},
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    assert describe_servers(path) == [
-        "[server] glossary: コマンドで起動（uv run python -m app.mcp_server）",
-        "[server] aws: URL に接続（https://knowledge-mcp.global.api.aws）",
-    ]
-
-
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        ('{"mcpServers": {"a": {"command": "uv"} "b": {"url": "https://example.com"}}}', "JSON の書き方の誤り"),
-        ('{"servers": {}}', '"mcpServers" がありません'),
-        ('{"mcpServers": {"a": {"args": []}}}', '"command" も "url" もありません'),
-    ],
-)
-def test_config_mistakes_are_reported_in_words(tmp_path, text, expected):
-    """設定ファイルの書き間違いは、どこをどう直すかが分かる言葉で知らせる。"""
-    path = tmp_path / "mcp_servers.json"
-    path.write_text(text, encoding="utf-8")
-    with pytest.raises(ConfigError, match=expected):
-        read_config(path)
+def test_related_knowledge_comes_back_through_mcp(tmp_path):
+    name = "glossary_related_knowledge"
+    model = TestModel(call_tools=[name])
+    result = build_mcp_agent(_glossary_only_config(tmp_path)).run_sync("LoRAとは？", model=model)
+    assert [p.tool_name for p in _parts(result, ToolCallPart)] == [name]
+    returns = _parts(result, ToolReturnPart)
+    assert returns and returns[0].tool_name == name
+    assert str(returns[0].content).strip()

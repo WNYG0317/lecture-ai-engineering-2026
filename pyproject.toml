@@ -11,6 +11,11 @@ dependencies = [
     "sqlite-vec==0.1.9",  # 第5回: SQLiteでベクトル検索
 ]
 
+[project.optional-dependencies]
+adk = [
+    "google-adk==2.14.0",
+]
+
 [dependency-groups]
 dev = ["pytest>=8"]
 
