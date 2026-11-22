@@ -43,7 +43,18 @@ uv sync --frozen
 uv run python -m app.retrieval "LoRA QLoRA 違い"
 uv run python -m app.agent --trace "LoRAとQLoRAの違いは？"
 uv run python -m app.agent --graph --trace "LoRAとQLoRAの違いは？"
+uv run python -m app.agent --hybrid --trace "LoRAとQLoRAの違いは？"
 ```
+
+`--hybrid`はTreeで講義・章・ページを選び、本文を読んだ後に根拠が十分かをモデルに判断させます。
+目次を開く前の充足判断や、まだ目次に表示されていないIDへの直接アクセスはコード側で拒否します。
+十分ならTreeの本文だけで回答し、不足ならTreeで読んだ重要ページ（最大3件）を入口にGraphを探索します。
+Graphでは既存の前後ページ・共通用語の関係を最大2 hop、入口を含め最大10ページまでたどります。
+この経路では検索DB・質問の埋め込みは使いません。Graphの後は再探索せずに回答し、不足が残れば明記します。
+Treeで入口を取得できなかった場合も、その制約を伝えます。
+Graphの読み込みに失敗した場合は、取得済みのTree本文とエラー情報を回答段階へ渡します。
+`--trace`には充足判断・不足情報・Graphの入口と取得結果、調査と回答生成を合算した利用量が表示されます。
+充足判断自体はモデルによるため、誤判断の可能性があります。本文と引用を確認してください。
 
 教材本文や埋め込み設定を変更した場合は、実験用のDBを作ります。`AIE_RAG_DB` を設定したターミナルでは、作成と検索の両方がそのパスを使います。
 
